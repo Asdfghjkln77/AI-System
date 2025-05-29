@@ -99,22 +99,22 @@ function AI_Handler.newAI(AI: Model, playStyle: string?)
 	assert(whoChases ~= nil, "Missing attribute: WhoChases")
 	assert(killInsteadOfInfect ~= nil, "Missing attribute: Kill_InsteadOf_Infect")
 	assert(infectTeamColor ~= nil, "Missing attribute: InfectTeamColor")
-	
+
 	local Hum = AI:FindFirstChildWhichIsA("Humanoid")
 	local Anima = Hum:FindFirstChild("Animator")
 	local RootPart: BasePart = AI:FindFirstChild("HumanoidRootPart")
-	
+
 	assert(Hum, "Missing: Humanoid")
 	assert(Anima, "Missing: Animator")
 	assert(RootPart, "Missing part: HumanoidRootPart")
-	
+
 	--// Required Chase values
 	local chaseFolder = AI:FindFirstChild("Chase")
 	assert(chaseFolder, "Missing folder: Chase")
-	
+
 	local animsFolder = AI:FindFirstChild("Animations")
 	assert(animsFolder, "Missing folder: Animations")
-	
+
 	local targetVal = chaseFolder:FindFirstChild("Target")
 	local distanceVal = chaseFolder:FindFirstChild("Distance")
 	local healthVal = chaseFolder:FindFirstChild("Health")
@@ -124,9 +124,9 @@ function AI_Handler.newAI(AI: Model, playStyle: string?)
 	assert(distanceVal, "Missing ValueBase: Distance")
 	assert(healthVal, "Missing ValueBase: Health")
 	assert(waypointsVal, "Missing ValueBase: Waypoints")
-	
+
 	local sounds, animations = {}, {}
-	
+
 	for _, v in RootPart:GetChildren() do
 		if v:IsA("Sound") then
 			sounds[v.Name] = v
@@ -137,7 +137,7 @@ function AI_Handler.newAI(AI: Model, playStyle: string?)
 			animations[v.Name] = v
 		end
 	end
-	
+
 	if RootPart:GetNetworkOwner() then
 		warn(`AI RootPart has an NetworkOwner ({RootPart:GetNetworkOwner()}), it'll be removed for the script to run correctly`)
 		RootPart.Anchored = false
@@ -152,20 +152,20 @@ function AI_Handler.newAI(AI: Model, playStyle: string?)
 	AI_Object.MaxAttackIndex = maxAttackIndex
 	AI_Object.Cooldown = cooldown
 	AI_Object.WhoChases = whoChases
-	
+
 	AI_Object.Humanoid = Hum
 	AI_Object.Animator = Anima
 	AI_Object.RootPart = RootPart
-	
+
 	AI_Object.ChaseFolder = chaseFolder
 	AI_Object.TargetV = targetVal
 	AI_Object.DistanceV = distanceVal
 	AI_Object.HealthV = healthVal
 	AI_Object.WaypointsV = waypointsVal
-	
+
 	AI_Object.Sounds = sounds
 	AI_Object.Animations = animations
-	
+
 	AI_Object._UseCombatHandler = false
 	AI_Object._InCooldown = false
 	AI_Object._Patrolling = false
@@ -201,32 +201,44 @@ function AI_Handler:FollowWaypoints()
 
 	self._Patrolling = true
 
-	for _, waypoint in ipairs(sortedWaypoints) do
+	for _, targetWaypoint in ipairs(sortedWaypoints) do
 		if not self._Patrolling then break end
 
-		self.Humanoid:MoveTo(waypoint.Position)
+		-- Gerar o caminho
+		local path = PS:CreatePath(self.PathParams)
+		local success, result = pcall(path.ComputeAsync, path, self.RootPart.Position, targetWaypoint.Position)
 
-		local finished = false
-		local connection
+		if path.Status == Enum.PathStatus.Success and success then
+			local waypoints = path:GetWaypoints()
+			for _, waypoint in ipairs(waypoints) do
+				if not self._Patrolling then break end
 
-		connection = self.Humanoid.MoveToFinished:Connect(function(reached)
-			finished = true
-			connection:Disconnect()
-		end)
+				self.Humanoid:MoveTo(waypoint.Position)
 
-		local timeout = 5
-		local timer = 0
-		while not finished and timer < timeout do
-			-- Check if target appears while waiting
-			local target = self._Playstyle:GetTarget(self)
-			if target then
-				self._Patrolling = false
-				connection:Disconnect()
-				self._Playstyle:FollowTarget(self, target)
-				return
+				local reached = false
+				local conn
+				conn = self.Humanoid.MoveToFinished:Connect(function()
+					reached = true
+					conn:Disconnect()
+				end)
+
+				local timeout = 5
+				local timer = 0
+				while not reached and timer < timeout do
+					-- Interrompe se detectar alvo durante o patrulhamento
+					local target = self._Playstyle:FindTarget(self)
+					if target then
+						self._Patrolling = false
+						conn:Disconnect()
+						self._Playstyle:FollowTarget(self, target)
+						return
+					end
+					task.wait(0.025)
+					timer += 0.025
+				end
 			end
-			task.wait(0.1)
-			timer += 0.1
+		else
+			warn("Failed to calculate the waypoint path", targetWaypoint.Name, result)
 		end
 	end
 
