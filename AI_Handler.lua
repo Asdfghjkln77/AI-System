@@ -13,10 +13,6 @@ for _, playStyle in script:GetChildren() do
 	end
 end
 
---// Helpers
-local getAtt = game.GetAttribute
-local findChild = game.FindFirstChild
-
 --// Default Navigation Costs
 local Costs = {
 	Climb = 1
@@ -119,10 +115,10 @@ function AI_Handler.newAI(AI: Model, playStyle: string?)
 	local animsFolder = AI:FindFirstChild("Animations")
 	assert(animsFolder, "Missing folder: Animations")
 	
-	local targetVal = findChild(chaseFolder, "Target")
-	local distanceVal = findChild(chaseFolder, "Distance")
-	local healthVal = findChild(chaseFolder, "Health")
-	local waypointsVal = findChild(chaseFolder, "Waypoints")
+	local targetVal = chaseFolder:FindFirstChild("Target")
+	local distanceVal = chaseFolder:FindFirstChild("Distance")
+	local healthVal = chaseFolder:FindFirstChild("Health")
+	local waypointsVal = chaseFolder:FindFirstChild("Waypoints")
 
 	assert(targetVal, "Missing ValueBase: Target")
 	assert(distanceVal, "Missing ValueBase: Distance")
